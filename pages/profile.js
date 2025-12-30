@@ -56,6 +56,21 @@ export default function Profile() {
         setSaving(false);
     };
 
+    function urlBase64ToUint8Array(base64String) {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding)
+            .replace(/\-/g, '+')
+            .replace(/_/g, '/');
+
+        const rawData = window.atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+
+        for (let i = 0; i < rawData.length; ++i) {
+            outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray;
+    }
+
     if (loading) return <Layout>Loading...</Layout>;
     if (!user) {
         if (typeof window !== 'undefined') router.push('/');
@@ -141,29 +156,41 @@ export default function Profile() {
                             variant="glass"
                             style={{ fontSize: '0.8rem', padding: '6px 12px' }}
                             onClick={async () => {
-                                // 1. Check for HTTPS (Required for Notifications)
+                                // 1. Check for HTTPS
                                 if (!window.isSecureContext) {
-                                    alert('Security Error: Notifications require HTTPS.\n\nSince you are testing via local IP (Http), the phone blocks this.\n\nIt will work once deployed to the web (Vercel/Netlify).');
-                                    return;
-                                }
-
-                                // 2. Check for iOS PWA
-                                if (!('Notification' in window)) {
-                                    alert('To enable notifications on iPhone:\n1. Tap Share (box with arrow)\n2. Tap "Add to Home Screen"\n3. Open the app from Home Screen');
+                                    alert('Security Error: Notifications require HTTPS (Deploy to Vercel).');
                                     return;
                                 }
 
                                 try {
+                                    // 2. Request Permission
                                     const permission = await Notification.requestPermission();
-                                    if (permission === 'granted') {
-                                        new Notification('Enabled!', { body: 'You will fail... if you do not read.' });
-                                        setMessage({ type: 'success', text: 'Notifications Enabled!' });
-                                    } else {
-                                        setMessage({ type: 'error', text: 'Permission Denied. Check settings.' });
+                                    if (permission !== 'granted') {
+                                        setMessage({ type: 'error', text: 'Permission Denied' });
+                                        return;
                                     }
+
+                                    setMessage({ type: 'success', text: 'Subscribing...' });
+
+                                    // 3. Register Service Worker & Subscribe
+                                    const registration = await navigator.serviceWorker.ready;
+                                    const sub = await registration.pushManager.subscribe({
+                                        userVisibleOnly: true,
+                                        applicationServerKey: urlBase64ToUint8Array(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY)
+                                    });
+
+                                    // 4. Save to Database
+                                    const { error } = await supabase.from('subscriptions').insert({
+                                        user_id: user.id,
+                                        subscription: sub
+                                    });
+
+                                    if (error) throw error;
+                                    setMessage({ type: 'success', text: 'Notifications Active! (7pm Daily)' });
+
                                 } catch (err) {
                                     console.error(err);
-                                    alert('Error requesting permission: ' + err.message);
+                                    setMessage({ type: 'error', text: 'Error: ' + err.message });
                                 }
                             }}
                         >
