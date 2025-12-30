@@ -44,6 +44,13 @@ struct DailyFeedView: View {
                                 Button(action: { weekOffset += 1 }) {
                                     Image(systemName: "chevron.right").foregroundColor(.white)
                                 }
+                                
+                                // Upload Button
+                                NavigationLink(destination: UploadView(reading: ReadingPlan.getReading(for: selectedDate)?.reading ?? "")) {
+                                    Image(systemName: "plus.circle.fill")
+                                        .font(.system(size: 24))
+                                        .foregroundColor(.blue)
+                                }
                             }
                         }
                         .padding(.horizontal)
@@ -203,6 +210,20 @@ struct PostCardView: View {
                     }
                     .frame(width: 44, height: 44)
                     .clipShape(Circle())
+                    .overlay(alignment: .bottomTrailing) {
+                        HStack(spacing: 2) {
+                            Image(systemName: "flame.fill")
+                                .font(.system(size: 10))
+                                .foregroundColor(.orange)
+                            Text("\(post.profiles?.streak_count ?? 0)")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(.white)
+                        }
+                        .padding(4)
+                        .background(Color.black.opacity(0.8))
+                        .clipShape(Capsule())
+                        .offset(x: 10, y: 5)
+                    }
                 } else {
                     Circle()
                         .fill(Color.gray.opacity(0.3))
@@ -212,6 +233,19 @@ struct PostCardView: View {
                                 .font(.headline)
                                 .foregroundColor(.white)
                         )
+                        // Add fallback flame too if desired
+                        .overlay(alignment: .bottomTrailing) {
+                            if let streak = post.profiles?.streak_count, streak > 0 {
+                                HStack(spacing: 2) {
+                                    Image(systemName: "flame.fill").font(.system(size: 10)).foregroundColor(.orange)
+                                    Text("\(streak)").font(.system(size: 10, weight: .bold)).foregroundColor(.white)
+                                }
+                                .padding(4)
+                                .background(Color.black.opacity(0.8))
+                                .clipShape(Capsule())
+                                .offset(x: 10, y: 5)
+                            }
+                        }
                 }
                 
                 VStack(alignment: .leading, spacing: 4) {
