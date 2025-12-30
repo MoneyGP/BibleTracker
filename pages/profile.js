@@ -156,13 +156,13 @@ export default function Profile() {
                             variant="glass"
                             style={{ fontSize: '0.8rem', padding: '6px 12px' }}
                             onClick={async () => {
-                                // 1. Check for HTTPS
-                                if (!window.isSecureContext) {
-                                    alert('Security Error: Notifications require HTTPS (Deploy to Vercel).');
-                                    return;
-                                }
-
                                 try {
+                                    // 1. Check for HTTPS
+                                    if (!window.isSecureContext) {
+                                        alert('Security Error: Notifications require HTTPS (Deploy to Vercel).');
+                                        return;
+                                    }
+
                                     // 2. Request Permission
                                     const permission = await Notification.requestPermission();
                                     if (permission !== 'granted') {
@@ -170,20 +170,28 @@ export default function Profile() {
                                         return;
                                     }
 
-                                    setMessage({ type: 'success', text: 'Subscribing...' });
+                                    setMessage({ type: 'success', text: 'Resetting Service Worker...' });
 
                                     // 3. Register Service Worker & Subscribe
                                     try {
-                                        console.log('Waiting for SW ready...');
-                                        const registration = await navigator.serviceWorker.ready;
-                                        if (!registration) throw new Error('No Service Worker found! Try reloading.');
+                                        // A. Unregister potential zombie workers
+                                        const regs = await navigator.serviceWorker.getRegistrations();
+                                        for (let reg of regs) {
+                                            await reg.unregister();
+                                            console.log('Unregistered zombie SW');
+                                        }
 
-                                        console.log('Subscribing via PushManager...');
-                                        const sub = await registration.pushManager.subscribe({
+                                        // B. Register Fresh
+                                        console.log('Registering /sw.js...');
+                                        const newReg = await navigator.serviceWorker.register('/sw.js');
+                                        await navigator.serviceWorker.ready;
+
+                                        // C. Subscribe
+                                        console.log('Subscribing...');
+                                        const sub = await newReg.pushManager.subscribe({
                                             userVisibleOnly: true,
                                             applicationServerKey: urlBase64ToUint8Array(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY)
                                         });
-                                        console.log('Got subscription:', sub);
 
                                         // 4. Save to Database
                                         alert('Subscription generated. Saving to DB...');
@@ -208,7 +216,7 @@ export default function Profile() {
                                 }
                             }}
                         >
-                            Test / Enable
+                            Enable 7pm Reminder
                         </Button>
                     </div>
                 </Card>
