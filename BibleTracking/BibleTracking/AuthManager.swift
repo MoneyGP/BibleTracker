@@ -41,6 +41,10 @@ class AuthManager: ObservableObject {
         _ = try await supabase.auth.signIn(email: email, password: password)
     }
     
+    func signUp(email: String, password: String) async throws {
+        _ = try await supabase.auth.signUp(email: email, password: password)
+    }
+    
     func signOut() async {
         try? await supabase.auth.signOut()
         self.session = nil

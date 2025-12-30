@@ -7,6 +7,9 @@ struct DailyFeedView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     
+    @State private var weeklyCalendar: [Date] = [] // unused, using computed
+    @State private var myStreak = 0
+    
     // Calendar Logic
     @State private var weekOffset = 0
     let calendar = Calendar.current
@@ -45,8 +48,25 @@ struct DailyFeedView: View {
                                     Image(systemName: "chevron.right").foregroundColor(.white)
                                 }
                                 
+                                // Streak Display
+                                HStack(spacing: 4) {
+                                    Image(systemName: "flame.fill")
+                                        .foregroundColor(.orange)
+                                    Text("\(myStreak)")
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.white)
+                                }
+                                .font(.caption)
+                                .padding(6)
+                                .background(Color.white.opacity(0.1))
+                                .clipShape(Capsule())
+                                
                                 // Upload Button
-                                NavigationLink(destination: UploadView(reading: ReadingPlan.getReading(for: selectedDate)?.reading ?? "")) {
+                                NavigationLink(destination: UploadView(reading: ReadingPlan.getReading(for: selectedDate)?.reading ?? "", targetDate: {
+                                    let f = DateFormatter()
+                                    f.dateFormat = "yyyy-MM-dd"
+                                    return f.string(from: selectedDate)
+                                }())) {
                                     Image(systemName: "plus.circle.fill")
                                         .font(.system(size: 24))
                                         .foregroundColor(.blue)
@@ -158,6 +178,31 @@ struct DailyFeedView: View {
         }
         .task {
             await fetchPosts()
+            await fetchMyStreak()
+        }
+    }
+    
+    func fetchMyStreak() async {
+        guard let userId = authManager.session?.user.id else { return }
+        do {
+            // Fetch all post dates for this user
+            struct DateOnly: Decodable {
+                let created_at: String
+            }
+            
+            let posts: [DateOnly] = try await supabase
+                .from("posts")
+                .select("created_at")
+                .eq("user_id", value: userId)
+                .order("created_at", ascending: false)
+                .execute()
+                .value
+            
+            let dates = posts.map { $0.created_at }
+            self.myStreak = StreakLogic.calculate(dates: dates)
+            
+        } catch {
+            print("Error fetching streak: \(error)")
         }
     }
     

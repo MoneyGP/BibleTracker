@@ -69,3 +69,47 @@ struct Like: Codable, Identifiable {
     var user_id: UUID
     var post_id: UUID
 }
+
+// MARK: - Streak Logic
+struct StreakLogic {
+    static func calculate(dates: [String]) -> Int {
+        let uniqueDates = Set(dates).sorted(by: >) // Descending
+        
+        guard !uniqueDates.isEmpty else { return 0 }
+        
+        let today = Date()
+        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: today)!
+        
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let todayStr = formatter.string(from: today)
+        let yesterdayStr = formatter.string(from: yesterday)
+        
+        // 1. Check valid start
+        let lastPostDate = uniqueDates[0]
+        if lastPostDate != todayStr && lastPostDate != yesterdayStr {
+            return 0
+        }
+        
+        // 2. Count consecutive
+        var streak = 1
+        var currentDate = formatter.date(from: lastPostDate)!
+        
+        for i in 1..<uniqueDates.count {
+            let prevDateStr = uniqueDates[i]
+            guard let prevDate = formatter.date(from: prevDateStr) else { continue }
+            
+            let expectedDate = Calendar.current.date(byAdding: .day, value: -1, to: currentDate)!
+            let expectedStr = formatter.string(from: expectedDate)
+            
+            if prevDateStr == expectedStr {
+                streak += 1
+                currentDate = prevDate
+            } else {
+                break
+            }
+        }
+        
+        return streak
+    }
+}
