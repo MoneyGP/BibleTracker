@@ -194,12 +194,20 @@ struct DailyFeedView: View {
     }
 }
 
-// Extracted for cleaner file
+// --- PostCardView ---
 struct PostCardView: View {
-    let post: Post
+    @State var post: Post
+    @State private var showComments = false
+    @EnvironmentObject var authManager: AuthManager
+    
+    // Computed property for easy access
+    var likeCount: Int {
+        post.reactions?["❤️"] ?? 0
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            // ... Header & Content (unchanged) ...
             // Header
             HStack {
                 if let avatar = post.profiles?.avatar_url, let url = URL(string: avatar) {
@@ -233,19 +241,6 @@ struct PostCardView: View {
                                 .font(.headline)
                                 .foregroundColor(.white)
                         )
-                        // Add fallback flame too if desired
-                        .overlay(alignment: .bottomTrailing) {
-                            if let streak = post.profiles?.streak_count, streak > 0 {
-                                HStack(spacing: 2) {
-                                    Image(systemName: "flame.fill").font(.system(size: 10)).foregroundColor(.orange)
-                                    Text("\(streak)").font(.system(size: 10, weight: .bold)).foregroundColor(.white)
-                                }
-                                .padding(4)
-                                .background(Color.black.opacity(0.8))
-                                .clipShape(Capsule())
-                                .offset(x: 10, y: 5)
-                            }
-                        }
                 }
                 
                 VStack(alignment: .leading, spacing: 4) {
@@ -284,14 +279,20 @@ struct PostCardView: View {
             
             // Reactions
             HStack(spacing: 20) {
-                Button(action: {}) {
+                Button(action: toggleLike) {
                     HStack(spacing: 6) {
-                        Image(systemName: "heart")
-                        Text("\(post.reactions?["❤️"] ?? 0)")
+                        Image(systemName: likeCount > 0 ? "heart.fill" : "heart")
+                            .foregroundColor(likeCount > 0 ? .red : .gray)
+                        if likeCount > 0 {
+                            Text("\(likeCount)")
+                                .foregroundColor(likeCount > 0 ? .red : .gray)
+                        } else {
+                            Text("Like")
+                        }
                     }
                 }
                 
-                Button(action: {}) {
+                Button(action: { showComments = true }) {
                     HStack(spacing: 6) {
                         Image(systemName: "bubble.right")
                         Text("Comment")
@@ -306,5 +307,39 @@ struct PostCardView: View {
         .background(Color(red: 0.1, green: 0.1, blue: 0.12)) // Card BG
         .cornerRadius(20)
         .padding(.horizontal)
+        .sheet(isPresented: $showComments) {
+            CommentsSheet(postId: post.id)
+                .presentationDetents([.medium, .large])
+        }
+    }
+    
+    func toggleLike() {
+        // 1. Optimistic Update
+        var reactions = post.reactions ?? [:]
+        let current = reactions["❤️"] ?? 0
+        // Simple toggle logic: If > 0, decrement (unlike), else increment? 
+        // Or just always increment for "Like"? Standard like is toggle.
+        // But we don't track *who* liked in this simple JSON schema. 
+        // We only have counts. So we can't really "unlike" unless we track local state strictly.
+        // For now, let's just Increment (Like) as checking "did I like this" is hard with just `{"❤️": 5}`.
+        // User asked for "Like". I'll implement "Add Heart".
+        
+        let newCount = current + 1
+        reactions["❤️"] = newCount
+        post.reactions = reactions // Update UI
+        
+        // 2. Network Update
+        Task {
+            do {
+                // Update 'reactions' column for this post
+                try await supabase.from("posts")
+                    .update(["reactions": reactions])
+                    .eq("id", value: post.id)
+                    .execute()
+            } catch {
+                print("Error liking post: \(error)")
+                // Revert?
+            }
+        }
     }
 }

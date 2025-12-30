@@ -18,11 +18,6 @@ struct ContentView: View {
                             Label("Today", systemImage: "book.fill")
                         }
                     
-                    StreaksView()
-                        .tabItem {
-                            Label("Streaks", systemImage: "flame.fill")
-                        }
-                    
                     // Profile/Logout Tab
                     Button("Sign Out") {
                         Task { await authManager.signOut() }
