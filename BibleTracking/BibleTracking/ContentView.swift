@@ -18,6 +18,11 @@ struct ContentView: View {
                             Label("Feed", systemImage: "list.bullet")
                         }
                     
+                    CalendarView()
+                        .tabItem {
+                            Label("Bible", systemImage: "book.fill")
+                        }
+                    
                     StreaksView()
                         .tabItem {
                             Label("Streaks", systemImage: "flame.fill")
