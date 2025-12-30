@@ -2,22 +2,40 @@
 import SwiftUI
 
 struct ContentView: View {
+    @EnvironmentObject var authManager: AuthManager
+    
     var body: some View {
-        TabView {
-            FeedView()
-                .tabItem {
-                    Label("Feed", systemImage: "list.bullet")
+        Group {
+            if authManager.isLoading {
+                ZStack {
+                    Color.black.ignoresSafeArea()
+                    ProgressView().tint(.white)
                 }
-            
-            StreaksView()
-                .tabItem {
-                    Label("Streaks", systemImage: "flame.fill")
+            } else if authManager.isAuthenticated {
+                TabView {
+                    FeedView()
+                        .tabItem {
+                            Label("Feed", systemImage: "list.bullet")
+                        }
+                    
+                    StreaksView()
+                        .tabItem {
+                            Label("Streaks", systemImage: "flame.fill")
+                        }
+                    
+                    // Profile/Logout Tab
+                    Button("Sign Out") {
+                        Task { await authManager.signOut() }
+                    }
+                    .tabItem {
+                        Label("Profile", systemImage: "person.circle")
+                    }
                 }
-            
-            Text("Upload (Coming Soon)")
-                .tabItem {
-                    Label("Post", systemImage: "plus.circle.fill")
-                }
+                .accentColor(.white)
+                .preferredColorScheme(.dark)
+            } else {
+                LoginView()
+            }
         }
     }
 }
