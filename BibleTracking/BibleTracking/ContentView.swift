@@ -13,14 +13,9 @@ struct ContentView: View {
                 }
             } else if authManager.isAuthenticated {
                 TabView {
-                    FeedView()
+                    DailyFeedView()
                         .tabItem {
-                            Label("Feed", systemImage: "list.bullet")
-                        }
-                    
-                    CalendarView()
-                        .tabItem {
-                            Label("Bible", systemImage: "book.fill")
+                            Label("Today", systemImage: "book.fill")
                         }
                     
                     StreaksView()

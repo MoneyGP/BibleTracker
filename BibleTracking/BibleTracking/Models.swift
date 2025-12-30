@@ -9,39 +9,28 @@ struct Profile: Codable, Identifiable {
 }
 
 struct Post: Codable, Identifiable {
-    var id: Int
+    var id: UUID // API sends UUID string
     var user_id: UUID
     var content: String?
     var image_url: String?
     var created_at: Date
+    var date: String? // YYYY-MM-DD
     var profiles: Profile? 
+    var reactions: [String: Int]?
     
     enum CodingKeys: String, CodingKey {
-        case id, user_id, content, image_url, created_at, profiles
+        case id, user_id, content, image_url, created_at, date, profiles, reactions
     }
     
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         
-        // DEBUG: Check what keys we actually have
-        // print("Keys present: \(container.allKeys.map { $0.stringValue })")
-        
-        // Handle ID: Try all reasonable types
-        if let intId = try? container.decode(Int.self, forKey: .id) {
-            id = intId
-        } else if let stringId = try? container.decode(String.self, forKey: .id), let intId = Int(stringId) {
-            id = intId
-        } else if let doubleId = try? container.decode(Double.self, forKey: .id) {
-            id = Int(doubleId) // Supabase sometimes sends big numbers as float-likes
-        } else {
-             // FAIL OPEN: If we can't decode the ID, don't crash the app. Just assign a temporary one.
-             print("⚠️ WARNING: Could not decode ID for a post. Using random fallback. Keys present: \(container.allKeys)")
-             id = Int.random(in: 100000...999999999)
-        }
-        
+        // Correctly decode UUID directly
+        id = try container.decode(UUID.self, forKey: .id)
         user_id = try container.decode(UUID.self, forKey: .user_id)
         content = try? container.decode(String.self, forKey: .content)
         image_url = try? container.decode(String.self, forKey: .image_url)
+        date = try? container.decode(String.self, forKey: .date)
         
         // Handle Date (Supabase sends ISO string)
         let dateString = try container.decode(String.self, forKey: .created_at)
@@ -56,5 +45,15 @@ struct Post: Codable, Identifiable {
         }
         
         profiles = try? container.decode(Profile.self, forKey: .profiles)
+        reactions = try? container.decode([String: Int].self, forKey: .reactions)
     }
+}
+
+struct Comment: Codable, Identifiable {
+    var id: Int // Comments ID is likely BigInt (Int in Swift) or UUID? The SQL says generated identity (Int)
+    var post_id: UUID // Changed to UUID
+    var user_id: UUID
+    var content: String
+    var created_at: Date
+    // var profiles: Profile? (if fetching with join)
 }
