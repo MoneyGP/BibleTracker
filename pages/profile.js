@@ -173,20 +173,34 @@ export default function Profile() {
                                     setMessage({ type: 'success', text: 'Subscribing...' });
 
                                     // 3. Register Service Worker & Subscribe
-                                    const registration = await navigator.serviceWorker.ready;
-                                    const sub = await registration.pushManager.subscribe({
-                                        userVisibleOnly: true,
-                                        applicationServerKey: urlBase64ToUint8Array(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY)
-                                    });
+                                    try {
+                                        console.log('Waiting for SW ready...');
+                                        const registration = await navigator.serviceWorker.ready;
+                                        if (!registration) throw new Error('No Service Worker found! Try reloading.');
 
-                                    // 4. Save to Database
-                                    const { error } = await supabase.from('subscriptions').insert({
-                                        user_id: user.id,
-                                        subscription: sub
-                                    });
+                                        console.log('Subscribing via PushManager...');
+                                        const sub = await registration.pushManager.subscribe({
+                                            userVisibleOnly: true,
+                                            applicationServerKey: urlBase64ToUint8Array(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY)
+                                        });
+                                        console.log('Got subscription:', sub);
 
-                                    if (error) throw error;
-                                    setMessage({ type: 'success', text: 'Notifications Active! (7pm Daily)' });
+                                        // 4. Save to Database
+                                        alert('Subscription generated. Saving to DB...');
+                                        const { error } = await supabase.from('subscriptions').insert({
+                                            user_id: user.id,
+                                            subscription: sub
+                                        });
+
+                                        if (error) throw error;
+                                        setMessage({ type: 'success', text: 'Active! (Check 7pm)' });
+                                        alert('Success! You are subscribed.');
+
+                                    } catch (stepError) {
+                                        console.error(stepError);
+                                        alert('Failed at step: ' + stepError.message);
+                                        setMessage({ type: 'error', text: 'Failed: ' + stepError.message });
+                                    }
 
                                 } catch (err) {
                                     console.error(err);
