@@ -30,10 +30,14 @@ struct ReadingPlan {
     ]
     
     static func getTodaysReading() -> DailyReading? {
+        return getReading(for: Date())
+    }
+    
+    static func getReading(for date: Date) -> DailyReading? {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
-        let todayStr = formatter.string(from: Date())
+        let dateStr = formatter.string(from: date)
         
-        return fullPlan.first { $0.date == todayStr } ?? fullPlan.first
+        return fullPlan.first { $0.date == dateStr }
     }
 }

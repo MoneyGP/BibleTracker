@@ -84,6 +84,42 @@ struct DailyFeedView: View {
                     .padding(.bottom, 16)
                     .background(Color(red: 0.1, green: 0.1, blue: 0.12))
                     
+                    // Today's Reading Card
+                    let reading = ReadingPlan.getReading(for: selectedDate)
+                    
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Reading for \(selectedDate.formatted(.dateTime.weekday().day().month()))")
+                            .font(.title2)
+                            .bold()
+                            .foregroundColor(.white)
+                        
+                        HStack {
+                            Image(systemName: "book.fill")
+                                .font(.system(size: 24))
+                                .foregroundColor(.blue)
+                            
+                            VStack(alignment: .leading) {
+                                Text(reading?.reading ?? "Rest Day / No Plan")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                Text("Tap to read passage")
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundColor(.gray)
+                        }
+                        .padding()
+                        .background(Color.white.opacity(0.05))
+                        .cornerRadius(16)
+                        .onTapGesture {
+                            // Could open Bible text in future
+                        }
+                    }
+                    .padding(.horizontal)
+                    .padding(.top, 10)
+                    
                     // --- Feed Content ---
                     if isLoading {
                         Spacer()
@@ -183,7 +219,7 @@ struct PostCardView: View {
                         .font(.headline)
                         .foregroundColor(.white)
                     
-                    Text(post.created_at.formatted(date: .none, time: .shortened))
+                    Text(post.created_at.formatted(date: .omitted, time: .shortened))
                         .font(.caption)
                         .foregroundColor(.gray)
                 }
