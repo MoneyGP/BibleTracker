@@ -34,14 +34,9 @@ struct Post: Codable, Identifiable {
         } else if let doubleId = try? container.decode(Double.self, forKey: .id) {
             id = Int(doubleId) // Supabase sometimes sends big numbers as float-likes
         } else {
-             // If completely missing, debug why
-             print("❌ FAILED to decode ID. Keys: \(container.allKeys)")
-             // Fallback to -1 or throw with better info
-             if container.contains(.id) {
-                 throw DecodingError.typeMismatch(Int.self, DecodingError.Context(codingPath: container.codingPath, debugDescription: "ID Present but not Int/String/Double"))
-             } else {
-                 throw DecodingError.keyNotFound(CodingKeys.id, DecodingError.Context(codingPath: container.codingPath, debugDescription: "Key 'id' missing"))
-             }
+             // FAIL OPEN: If we can't decode the ID, don't crash the app. Just assign a temporary one.
+             print("⚠️ WARNING: Could not decode ID for a post. Using random fallback. Keys present: \(container.allKeys)")
+             id = Int.random(in: 100000...999999999)
         }
         
         user_id = try container.decode(UUID.self, forKey: .user_id)
