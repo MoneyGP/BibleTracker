@@ -18,13 +18,11 @@ struct ContentView: View {
                             Label("Today", systemImage: "book.fill")
                         }
                     
-                    // Profile/Logout Tab
-                    Button("Sign Out") {
-                        Task { await authManager.signOut() }
-                    }
-                    .tabItem {
-                        Label("Profile", systemImage: "person.circle")
-                    }
+                    // Profile Tab
+                    ProfileView()
+                        .tabItem {
+                            Label("Profile", systemImage: "person.circle")
+                        }
                 }
                 .accentColor(.white)
                 .preferredColorScheme(.dark)
