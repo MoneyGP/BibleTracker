@@ -92,7 +92,7 @@ struct DailyFeedView: View {
                     .background(Color(red: 0.1, green: 0.1, blue: 0.12))
                     
                     // Today's Reading Card
-                    let reading = ReadingPlan.getReading(for: selectedDate)
+                    let readingForSelectedDate = ReadingPlan.getReading(for: selectedDate)
                     
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Reading for \(selectedDate.formatted(.dateTime.weekday().day().month()))")
@@ -106,7 +106,7 @@ struct DailyFeedView: View {
                                 .foregroundColor(.blue)
                             
                             VStack(alignment: .leading) {
-                                Text(reading?.reading ?? "Rest Day / No Plan")
+                                Text(readingForSelectedDate?.reading ?? "Rest Day / No Plan")
                                     .font(.headline)
                                     .foregroundColor(.white)
                             }

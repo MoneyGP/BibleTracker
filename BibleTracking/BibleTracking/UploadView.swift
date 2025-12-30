@@ -3,59 +3,155 @@ import SwiftUI
 import PhotosUI
 
 struct UploadView: View {
-    let reading: String
+    let reading: String // Reference string
+    let targetDate: String // YYYY-MM-DD
     @State private var caption = ""
-    @State private var selectedItem: PhotosPickerItem?
-    @State private var selectedImage: Image?
-    @State private var uiImage: UIImage?
-    @State private var isLoading = false
+    @State private var showCamera = false
+    @State private var showActionSheet = false
+    
+    @State private var selectedItem: PhotosPickerItem? = nil
+    @State private var selectedImage: Image? = nil
+    @State private var uiImage: UIImage? = nil
+    
+    @State private var isUploading = false
     @State private var errorMessage: String?
     @Environment(\.dismiss) var dismiss
     
     @EnvironmentObject var authManager: AuthManager
     
+    // Check if targetDate is Today (local time)
+    var isToday: Bool {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let todayStr = formatter.string(from: Date())
+        return targetDate == todayStr
+    }
+    
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
-                // Header
-                Text("Post Reading")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-                    .padding(.top)
-                
-                Text(reading)
-                    .font(.headline)
-                    .foregroundColor(.blue)
-                
-                // Image Picker
-                PhotosPicker(selection: $selectedItem, matching: .images) {
-                     pickerContent
+                // Header (same)
+                HStack {
+                    Button("Cancel") { dismiss() }
+                        .foregroundColor(.white)
+                    Spacer()
+                    Text("New Post")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                    Spacer()
+                    // Hidden placeholder for balance
+                    Text("Cancel").hidden()
                 }
-                .onChange(of: selectedItem, perform: loadTransferable)
+                .padding()
                 
-                // Caption
-                TextField("Write a caption...", text: $caption)
-                    .padding()
-                    .background(Color.white.opacity(0.05))
-                    .cornerRadius(12)
-                    .foregroundColor(.white)
+                // Reading Card (same)
+                VStack(spacing: 8) {
+                    Text(reading)
+                        .font(.title2)
+                        .bold()
+                        .foregroundColor(.white)
+                        .multilineTextAlignment(.center)
+                }
+                .padding()
+                .frame(maxWidth: .infinity)
+                .background(Color.white.opacity(0.1))
+                .cornerRadius(16)
                 
-                // Submit Button
+                // Image Selection Area
+                if let selectedImage {
+                    selectedImage
+                        .resizable()
+                        .scaledToFill()
+                        .frame(height: 300)
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                        .overlay(alignment: .topTrailing) {
+                            Button(action: {
+                                // Clear image
+                                self.selectedImage = nil
+                                self.uiImage = nil
+                                self.selectedItem = nil
+                            }) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.title)
+                                    .foregroundColor(.white)
+                                    .padding(8)
+                            }
+                        }
+                } else {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(Color.white.opacity(0.05))
+                            .frame(height: 300)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(Color.white.opacity(0.1), style: StrokeStyle(lineWidth: 1, dash: [5]))
+                            )
+                        
+                        VStack(spacing: 20) {
+                            if isToday {
+                                HStack(spacing: 30) {
+                                    Button(action: { showCamera = true }) {
+                                        VStack(spacing: 8) {
+                                            Image(systemName: "camera.fill")
+                                                .font(.system(size: 30))
+                                            Text("Camera")
+                                        }
+                                        .foregroundColor(.blue)
+                                    }
+                                    
+                                    PhotosPicker(selection: $selectedItem, matching: .images) {
+                                        VStack(spacing: 8) {
+                                            Image(systemName: "photo.fill.on.rectangle.fill")
+                                                .font(.system(size: 30))
+                                            Text("Library")
+                                        }
+                                        .foregroundColor(.purple)
+                                    }
+                                    .onChange(of: selectedItem) { newItem in
+                                        loadTransferable(newItem)
+                                    }
+                                }
+                            } else {
+                                Image(systemName: "lock.fill")
+                                    .font(.system(size: 40))
+                                    .foregroundColor(.gray)
+                                Text("Upload Locked")
+                                    .foregroundColor(.gray)
+                            }
+                        }
+                    }
+                }
+                
+                if !isToday {
+                    HStack {
+                        Image(systemName: "clock.badge.exclamationmark")
+                        Text("You can only upload for today's reading.")
+                    }
+                    .font(.caption)
+                    .foregroundColor(.orange)
+                    .padding(.top, 4)
+                }
+                
+                // Input & Button ...
+                TextField("Add a thought or prayer... (optional)", text: $caption, axis: .vertical)
+                    .textFieldStyle(.roundedBorder)
+                    .lineLimit(3...6)
+                    .padding(.vertical)
+                
                 Button(action: uploadPost) {
-                    if isLoading {
+                    if isUploading {
                         ProgressView().tint(.white)
                     } else {
-                        Text("Post")
-                            .fontWeight(.bold)
+                        Text("Post Update")
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(uiImage == nil ? Color.gray.opacity(0.3) : Color.blue)
+                            .background((selectedImage == nil || !isToday) ? Color.gray : Color.blue)
                             .foregroundColor(.white)
                             .cornerRadius(12)
                     }
                 }
-                .disabled(uiImage == nil || isLoading)
+                .disabled(selectedImage == nil || isUploading || !isToday)
                 
                 if let error = errorMessage {
                     Text(error)
@@ -66,40 +162,20 @@ struct UploadView: View {
             .padding()
         }
         .background(Color.black.ignoresSafeArea())
-    }
-    
-    @ViewBuilder
-    var pickerContent: some View {
-        if let selectedImage {
-            selectedImage
-                .resizable()
-                .scaledToFill()
-                .frame(height: 300)
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                )
-        } else {
-            ZStack {
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.white.opacity(0.05))
-                    .frame(height: 300)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(Color.white.opacity(0.1), style: StrokeStyle(lineWidth: 1, dash: [5]))
-                    )
-                
-                VStack(spacing: 12) {
-                    Image(systemName: "camera.fill")
-                        .font(.system(size: 40))
-                        .foregroundColor(.blue)
-                    Text("Tap to select photo")
-                        .foregroundColor(.gray)
-                }
+        .fullScreenCover(isPresented: $showCamera) {
+            CameraView(image: $uiImage)
+                .ignoresSafeArea()
+        }
+        // Sync UIImage to SwiftUI Image (from Camera)
+        .onChange(of: uiImage) { newImage in
+            if let newImage {
+                selectedImage = Image(uiImage: newImage)
             }
         }
     }
+    
+    // Extracted Picker Content won't work easily with ActionSheet logic unless we do custom sheet.
+
     
     func loadTransferable(_ newItem: PhotosPickerItem?) {
         Task {
