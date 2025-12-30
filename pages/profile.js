@@ -169,9 +169,16 @@ export default function Profile() {
                                     console.log('Registered:', reg);
 
                                     // STEP 2
-                                    setMessage({ type: 'success', text: 'Step 2: Waiting for Active...' });
-
-                                    await navigator.serviceWorker.ready;
+                                    if (reg.active) {
+                                        setMessage({ type: 'success', text: 'Step 2: SW Active (Fast Path)' });
+                                    } else if (reg.waiting) {
+                                        setMessage({ type: 'error', text: 'Step 2: SW Waiting (Please Reload Page!)' });
+                                        alert('Update stuck. Please RELOAD the page and try again.');
+                                        return;
+                                    } else {
+                                        setMessage({ type: 'success', text: 'Step 2: Installing (Wait...)' });
+                                        await navigator.serviceWorker.ready;
+                                    }
 
                                     // STEP 3
                                     setMessage({ type: 'success', text: 'Step 3: Subscribing...' });
