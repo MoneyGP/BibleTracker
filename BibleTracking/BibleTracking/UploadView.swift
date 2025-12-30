@@ -30,45 +30,9 @@ struct UploadView: View {
                 
                 // Image Picker
                 PhotosPicker(selection: $selectedItem, matching: .images) {
-                    if let selectedImage {
-                        selectedImage
-                            .resizable()
-                            .scaledToFill()
-                            .frame(height: 300)
-                            .clipShape(RoundedRectangle(cornerRadius: 16))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                            )
-                    } else {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(Color.white.opacity(0.05))
-                                .frame(height: 300)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 16)
-                                        .stroke(Color.white.opacity(0.1), lineWidth: 1, dash: [5])
-                                )
-                            
-                            VStack(spacing: 12) {
-                                Image(systemName: "camera.fill")
-                                    .font(.system(size: 40))
-                                    .foregroundColor(.blue)
-                                Text("Tap to select photo")
-                                    .foregroundColor(.gray)
-                            }
-                        }
-                    }
+                     pickerContent
                 }
-                .onChange(of: selectedItem) { newItem in
-                    Task {
-                        if let data = try? await newItem?.loadTransferable(type: Data.self),
-                           let image = UIImage(data: data) {
-                            self.uiImage = image
-                            self.selectedImage = Image(uiImage: image)
-                        }
-                    }
-                }
+                .onChange(of: selectedItem, perform: loadTransferable)
                 
                 // Caption
                 TextField("Write a caption...", text: $caption)
@@ -104,6 +68,49 @@ struct UploadView: View {
         .background(Color.black.ignoresSafeArea())
     }
     
+    @ViewBuilder
+    var pickerContent: some View {
+        if let selectedImage {
+            selectedImage
+                .resizable()
+                .scaledToFill()
+                .frame(height: 300)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                )
+        } else {
+            ZStack {
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.white.opacity(0.05))
+                    .frame(height: 300)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(Color.white.opacity(0.1), style: StrokeStyle(lineWidth: 1, dash: [5]))
+                    )
+                
+                VStack(spacing: 12) {
+                    Image(systemName: "camera.fill")
+                        .font(.system(size: 40))
+                        .foregroundColor(.blue)
+                    Text("Tap to select photo")
+                        .foregroundColor(.gray)
+                }
+            }
+        }
+    }
+    
+    func loadTransferable(_ newItem: PhotosPickerItem?) {
+        Task {
+            if let data = try? await newItem?.loadTransferable(type: Data.self),
+               let image = UIImage(data: data) {
+                self.uiImage = image
+                self.selectedImage = Image(uiImage: image)
+            }
+        }
+    }
+    
     func uploadPost() {
         guard let uiImage = uiImage, let user = authManager.session?.user else { return }
         isLoading = true
@@ -115,14 +122,28 @@ struct UploadView: View {
                 guard let imageData = uiImage.jpegData(compressionQuality: 0.5) else { return }
                 let fileName = "\(user.id)/\(UUID().uuidString).jpg"
                 
-                // Note: Using standard storage upload (assuming bucket 'posts' exists)
-                try await supabase.storage.from("posts").upload(
+                // Using standard upload
+                let _ = try await supabase.storage.from("posts").upload(
                     path: fileName,
-                    file: imageData,
-                    options: FileOptions(contentType: "image/jpeg")
+                    file: imageData
                 )
                 
-                let publicUrl = try supabase.storage.from("posts").getPublicUrl(path: fileName)
+                // 2. Get Public URL (Fix: Manual construction if SDK fails or try getPublicURL)
+                // Note: getPublicUrl is sometimes synchronous in newer SDKs or named differently.
+                // Assuming standard Supabase Storage URL format:
+                // https://<project>.supabase.co/storage/v1/object/public/<bucket>/<path>
+                // But let's try the SDK method `getPublicURL` (capital URL) first.
+                // If the user says it doesn't exist, I'll construct it. The user said 'getPublicUrl' has no member.
+                // It's likely `publicURL(path:)` or `getPublicURL(path:)` doesn't exist on `StorageFileApi`.
+                // In some versions it is `from(...).publicUrl(...)` ?
+                // I will blindly construct it for reliability.
+                 
+                 // BUT I need the base URL. I don't have it easily accessible as a string global variable except in SupabaseManager maybe?
+                 // Let's look at `SupabaseManager.swift` first? No, I'll assume `getPublicURL` was just a typo in casing?
+                 // User said: Value of type 'StorageFileApi' has no member 'getPublicUrl'
+                 // I will try `getPublicURL` (capital URL).
+                
+                let publicUrl = try supabase.storage.from("posts").getPublicURL(path: fileName) // Capital URL
                 
                 // 2. Insert Post Record
                 let formatter = DateFormatter()
@@ -131,9 +152,10 @@ struct UploadView: View {
                 
                 let newPost = PostWrapper(
                    user_id: user.id,
-                   content: caption.isEmpty ? nil : caption,
+                   caption: caption.isEmpty ? nil : caption,
                    image_url: publicUrl.absoluteString,
-                   date: dateStr
+                   date: dateStr,
+                   reading_ref: reading
                 )
                 
                 try await supabase.from("posts").insert(newPost).execute()
@@ -151,9 +173,11 @@ struct UploadView: View {
 }
 
 // Helper for Insert (since Post has extra decode fields)
+// Helper for Insert (since Post has extra decode fields)
 struct PostWrapper: Encodable {
     let user_id: UUID
-    let content: String?
+    let caption: String?
     let image_url: String?
     let date: String
+    let reading_ref: String
 }

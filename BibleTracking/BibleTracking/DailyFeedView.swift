@@ -109,13 +109,8 @@ struct DailyFeedView: View {
                                 Text(reading?.reading ?? "Rest Day / No Plan")
                                     .font(.headline)
                                     .foregroundColor(.white)
-                                Text("Tap to read passage")
-                                    .font(.subheadline)
-                                    .foregroundColor(.gray)
                             }
                             Spacer()
-                            Image(systemName: "chevron.right")
-                                .foregroundColor(.gray)
                         }
                         .padding()
                         .background(Color.white.opacity(0.05))
@@ -200,14 +195,13 @@ struct PostCardView: View {
     @State private var showComments = false
     @EnvironmentObject var authManager: AuthManager
     
-    // Computed property for easy access
-    var likeCount: Int {
-        post.reactions?["❤️"] ?? 0
-    }
+    // Real State
+    @State private var isLiked = false
+    @State private var likeCount = 0
+    // We can also fetch comment count if desired
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // ... Header & Content (unchanged) ...
             // Header
             HStack {
                 if let avatar = post.profiles?.avatar_url, let url = URL(string: avatar) {
@@ -257,7 +251,7 @@ struct PostCardView: View {
             }
             
             // Content
-            if let content = post.content, !content.isEmpty {
+            if let content = post.caption, !content.isEmpty {
                 Text(content)
                     .font(.body)
                     .foregroundColor(Color(white: 0.9))
@@ -281,16 +275,17 @@ struct PostCardView: View {
             HStack(spacing: 20) {
                 Button(action: toggleLike) {
                     HStack(spacing: 6) {
-                        Image(systemName: likeCount > 0 ? "heart.fill" : "heart")
-                            .foregroundColor(likeCount > 0 ? .red : .gray)
+                        Image(systemName: isLiked ? "heart.fill" : "heart")
+                            .foregroundColor(isLiked ? .red : .gray)
                         if likeCount > 0 {
                             Text("\(likeCount)")
-                                .foregroundColor(likeCount > 0 ? .red : .gray)
+                                .foregroundColor(isLiked ? .red : .gray)
                         } else {
                             Text("Like")
                         }
                     }
                 }
+                .disabled(authManager.session == nil)
                 
                 Button(action: { showComments = true }) {
                     HStack(spacing: 6) {
@@ -311,35 +306,76 @@ struct PostCardView: View {
             CommentsSheet(postId: post.id)
                 .presentationDetents([.medium, .large])
         }
+        .task {
+            // Initial fetch of likes
+            await fetchLikeState()
+        }
+    }
+    
+    func fetchLikeState() async {
+        guard let userId = authManager.session?.user.id else { return }
+        
+        // 1. Check if I liked it
+        do {
+             let myLikes: [Like] = try await supabase.from("likes")
+                .select()
+                .eq("post_id", value: post.id)
+                .eq("user_id", value: userId)
+                .execute()
+                .value
+            
+            isLiked = !myLikes.isEmpty
+            
+            // 2. Count total likes
+            // Ideally use .count option, but for MVP standard select is okay or specialized RPC
+            // Supabase-swift count:
+            let result = try await supabase.from("likes")
+                .select("id", head: true, count: .exact)
+                .eq("post_id", value: post.id)
+                .execute()
+            
+            likeCount = result.count ?? 0
+            
+        } catch {
+            print("Error fetching likes: \(error)")
+        }
     }
     
     func toggleLike() {
-        // 1. Optimistic Update
-        var reactions = post.reactions ?? [:]
-        let current = reactions["❤️"] ?? 0
-        // Simple toggle logic: If > 0, decrement (unlike), else increment? 
-        // Or just always increment for "Like"? Standard like is toggle.
-        // But we don't track *who* liked in this simple JSON schema. 
-        // We only have counts. So we can't really "unlike" unless we track local state strictly.
-        // For now, let's just Increment (Like) as checking "did I like this" is hard with just `{"❤️": 5}`.
-        // User asked for "Like". I'll implement "Add Heart".
+        guard let userId = authManager.session?.user.id else { return }
         
-        let newCount = current + 1
-        reactions["❤️"] = newCount
-        post.reactions = reactions // Update UI
+        let previousState = isLiked
+        let previousCount = likeCount
         
-        // 2. Network Update
+        // Optimistic
+        isLiked.toggle()
+        likeCount += isLiked ? 1 : -1
+        
         Task {
             do {
-                // Update 'reactions' column for this post
-                try await supabase.from("posts")
-                    .update(["reactions": reactions])
-                    .eq("id", value: post.id)
-                    .execute()
+                if isLiked {
+                    // Insert
+                    let newLike = LikeInsert(user_id: userId, post_id: post.id)
+                    try await supabase.from("likes").insert(newLike).execute()
+                } else {
+                    // Delete
+                    try await supabase.from("likes")
+                        .delete()
+                        .eq("post_id", value: post.id)
+                        .eq("user_id", value: userId)
+                        .execute()
+                }
             } catch {
-                print("Error liking post: \(error)")
-                // Revert?
+                print("Error toggling like: \(error)")
+                // Revert
+                isLiked = previousState
+                likeCount = previousCount
             }
         }
     }
+}
+
+struct LikeInsert: Encodable {
+    let user_id: UUID
+    let post_id: UUID
 }

@@ -6,40 +6,46 @@ struct Profile: Codable, Identifiable {
     var username: String?
     var full_name: String?
     var avatar_url: String?
+    var streak_count: Int? // Added for flame overlay
+    
+    enum CodingKeys: String, CodingKey {
+        case id, username, full_name, avatar_url, streak_count
+    }
 }
 
 struct Post: Codable, Identifiable {
     var id: UUID // API sends UUID string
     var user_id: UUID
-    var content: String?
+    var caption: String? // Changed from 'content' to match DB
     var image_url: String?
+    var reading_ref: String? // Added to match text column
     var created_at: Date
     var date: String? // YYYY-MM-DD
     var profiles: Profile? 
     var reactions: [String: Int]?
+    // var likes: [Like]? // (Optional)
     
     enum CodingKeys: String, CodingKey {
-        case id, user_id, content, image_url, created_at, date, profiles, reactions
+        case id, user_id, caption, image_url, reading_ref, created_at, date, profiles, reactions
     }
     
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         
-        // Correctly decode UUID directly
         id = try container.decode(UUID.self, forKey: .id)
         user_id = try container.decode(UUID.self, forKey: .user_id)
-        content = try? container.decode(String.self, forKey: .content)
+        caption = try? container.decode(String.self, forKey: .caption)
         image_url = try? container.decode(String.self, forKey: .image_url)
+        reading_ref = try? container.decode(String.self, forKey: .reading_ref)
         date = try? container.decode(String.self, forKey: .date)
         
-        // Handle Date (Supabase sends ISO string)
+        // Handle Date
         let dateString = try container.decode(String.self, forKey: .created_at)
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = formatter.date(from: dateString) {
-            created_at = date
+        if let d = formatter.date(from: dateString) {
+            created_at = d
         } else {
-            // Fallback for no fractional seconds
             let fallback = ISO8601DateFormatter()
             created_at = fallback.date(from: dateString) ?? Date()
         }
@@ -50,10 +56,16 @@ struct Post: Codable, Identifiable {
 }
 
 struct Comment: Codable, Identifiable {
-    var id: Int // Comments ID is likely BigInt (Int in Swift) or UUID? The SQL says generated identity (Int)
-    var post_id: UUID // Changed to UUID
+    var id: Int
+    var post_id: UUID
     var user_id: UUID
     var content: String
     var created_at: Date
-    // var profiles: Profile? (if fetching with join)
+    var profiles: Profile? // Joined author info
+}
+
+struct Like: Codable, Identifiable {
+    var id: UUID
+    var user_id: UUID
+    var post_id: UUID
 }
