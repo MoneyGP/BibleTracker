@@ -1,24 +1,23 @@
-//
-//  ContentView.swift
-//  BibleTracking
-//
-//  Created by Grant Pfizenmaier on 12/29/25.
-//
 
 import SwiftUI
 
 struct ContentView: View {
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+        TabView {
+            FeedView()
+                .tabItem {
+                    Label("Feed", systemImage: "list.bullet")
+                }
+            
+            StreaksView()
+                .tabItem {
+                    Label("Streaks", systemImage: "flame.fill")
+                }
+            
+            Text("Upload (Coming Soon)")
+                .tabItem {
+                    Label("Post", systemImage: "plus.circle.fill")
+                }
         }
-        .padding()
     }
-}
-
-#Preview {
-    ContentView()
 }
