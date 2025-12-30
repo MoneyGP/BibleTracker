@@ -8,7 +8,10 @@ struct BibleTrackingApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environmentObject(authManager)
+                .environmentObject(AuthManager.shared)
+                .task {
+                    await NotificationManager.shared.startListening()
+                }
         }
     }
 }

@@ -4,6 +4,8 @@ import UserNotifications
 
 struct ProfileView: View {
     @EnvironmentObject var authManager: AuthManager
+    @ObservedObject var notifyManager = NotificationManager.shared
+    
     @State private var username: String = ""
     @State private var isEditing = false
     @State private var isLoading = false
@@ -64,6 +66,19 @@ struct ProfileView: View {
                     
                     List {
                         Section(header: Text("Preferences").foregroundColor(.gray)) {
+                            // Social Notifications
+                            Toggle("Notify on New Posts", isOn: $notifyManager.socialNotificationsEnabled)
+                                .onChange(of: notifyManager.socialNotificationsEnabled) { enabled in
+                                    Task {
+                                        if enabled {
+                                            await notifyManager.startListening()
+                                        } else {
+                                            await notifyManager.stopListening()
+                                        }
+                                    }
+                                }
+                            
+                            // Daily Reminder
                             Toggle("Daily Reading Reminder", isOn: $notificationsEnabled)
                                 .onChange(of: notificationsEnabled) { enabled in
                                     if enabled {
