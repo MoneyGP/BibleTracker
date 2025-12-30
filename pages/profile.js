@@ -157,62 +157,45 @@ export default function Profile() {
                             style={{ fontSize: '0.8rem', padding: '6px 12px' }}
                             onClick={async () => {
                                 try {
-                                    // 1. Check for HTTPS
-                                    if (!window.isSecureContext) {
-                                        alert('Security Error: Notifications require HTTPS (Deploy to Vercel).');
-                                        return;
-                                    }
+                                    if (!window.isSecureContext) return alert('HTTPS Required');
 
-                                    // 2. Request Permission
                                     const permission = await Notification.requestPermission();
-                                    if (permission !== 'granted') {
-                                        setMessage({ type: 'error', text: 'Permission Denied' });
-                                        return;
-                                    }
+                                    if (permission !== 'granted') return alert('Denied');
 
-                                    setMessage({ type: 'success', text: 'Resetting Service Worker...' });
+                                    // STEP 1
+                                    setMessage({ type: 'success', text: 'Step 1: Registering...' });
 
-                                    // 3. Register Service Worker & Subscribe
-                                    try {
-                                        // A. Unregister potential zombie workers
-                                        const regs = await navigator.serviceWorker.getRegistrations();
-                                        for (let reg of regs) {
-                                            await reg.unregister();
-                                            console.log('Unregistered zombie SW');
-                                        }
+                                    const reg = await navigator.serviceWorker.register('/sw.js');
+                                    console.log('Registered:', reg);
 
-                                        // B. Register Fresh
-                                        console.log('Registering /sw.js...');
-                                        const newReg = await navigator.serviceWorker.register('/sw.js');
-                                        await navigator.serviceWorker.ready;
+                                    // STEP 2
+                                    setMessage({ type: 'success', text: 'Step 2: Waiting for Active...' });
 
-                                        // C. Subscribe
-                                        console.log('Subscribing...');
-                                        const sub = await newReg.pushManager.subscribe({
-                                            userVisibleOnly: true,
-                                            applicationServerKey: urlBase64ToUint8Array(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY)
-                                        });
+                                    await navigator.serviceWorker.ready;
 
-                                        // 4. Save to Database
-                                        alert('Subscription generated. Saving to DB...');
-                                        const { error } = await supabase.from('subscriptions').insert({
-                                            user_id: user.id,
-                                            subscription: sub
-                                        });
+                                    // STEP 3
+                                    setMessage({ type: 'success', text: 'Step 3: Subscribing...' });
 
-                                        if (error) throw error;
-                                        setMessage({ type: 'success', text: 'Active! (Check 7pm)' });
-                                        alert('Success! You are subscribed.');
+                                    const sub = await reg.pushManager.subscribe({
+                                        userVisibleOnly: true,
+                                        applicationServerKey: urlBase64ToUint8Array(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY)
+                                    });
 
-                                    } catch (stepError) {
-                                        console.error(stepError);
-                                        alert('Failed at step: ' + stepError.message);
-                                        setMessage({ type: 'error', text: 'Failed: ' + stepError.message });
-                                    }
+                                    // STEP 4
+                                    setMessage({ type: 'success', text: 'Step 4: Saving...' });
+
+                                    const { error } = await supabase.from('subscriptions').insert({
+                                        user_id: user.id,
+                                        subscription: sub
+                                    });
+
+                                    if (error) throw error;
+                                    setMessage({ type: 'success', text: 'Done! (Check 7pm)' });
+                                    alert('Success! Notifications Active.');
 
                                 } catch (err) {
-                                    console.error(err);
-                                    setMessage({ type: 'error', text: 'Error: ' + err.message });
+                                    alert('Error: ' + err.message);
+                                    setMessage({ type: 'error', text: err.message });
                                 }
                             }}
                         >
